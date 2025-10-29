@@ -1,7 +1,7 @@
 "use client";
 
 import { useStacks } from "@/hooks/use-stacks";
-import { abbreviateAddress } from "@/lib/stx-utils";
+import { abbreviateAddress } from "@/lib/types/stx-utils";
 import Link from "next/link";
 
 export function Navbar() {

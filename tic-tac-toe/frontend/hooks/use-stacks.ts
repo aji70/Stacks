@@ -1,5 +1,5 @@
-import { createNewGame, joinGame, Move, play } from "@/lib/contract";
-import { getStxBalance } from "@/lib/stx-utils";
+import { createNewGame, joinGame, Move, play } from "@/lib/types/contract";
+import { getStxBalance } from "@/lib/types/stx-utils";
 import {
   connect,
   disconnect,
