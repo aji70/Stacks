@@ -1,11 +1,11 @@
 "use client";
 
-import { Game } from "@/lib/types/contract";
+import { Game } from "@/lib/contract";
 import Link from "next/link";
 import { GameBoard } from "./game-board";
 import { useStacks } from "@/hooks/use-stacks";
 import { useMemo } from "react";
-import { formatStx } from "@/lib/types/stx-utils";
+import { formatStx } from "@/lib/stx-utils";
 
 export function GamesList({ games }: { games: Game[] }) {
   const { userData } = useStacks();

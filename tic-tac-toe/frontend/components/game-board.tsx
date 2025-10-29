@@ -1,6 +1,6 @@
 "use client";
 
-import { Move } from "@/lib/types/contract";
+import { Move } from "@/lib/contract";
 
 type GameBoardProps = {
   board: Move[];

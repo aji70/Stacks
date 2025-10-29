@@ -1,8 +1,8 @@
 "use client";
 
-import { Game, Move } from "@/lib/types/contract";
+import { Game, Move } from "@/lib/contract";
 import { GameBoard } from "./game-board";
-import { abbreviateAddress, explorerAddress, formatStx } from "@/lib/types/stx-utils";
+import { abbreviateAddress, explorerAddress, formatStx } from "@/lib/stx-utils";
 import Link from "next/link";
 import { useStacks } from "@/hooks/use-stacks";
 import { useState } from "react";
