@@ -1,5 +1,5 @@
-import { createNewGame, joinGame, Move, play } from "@/lib/types/contract";
-import { getStxBalance } from "@/lib/types/stx-utils";
+import { register, isRegistered, getUser, User } from "@/lib/tycoon";
+import { getStxBalance } from "@/lib/stx-utils";
 import {
   connect,
   disconnect,
@@ -23,6 +23,7 @@ export function useStacks() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [stxBalance, setStxBalance] = useState(0);
   const [network, setNetwork] = useState<Network>(null);
+  const [tycoonUser, setTycoonUser] = useState<User | null>(null);
 
   function handleUserData(data: UserData | null) {
     if (data) {
@@ -34,6 +35,7 @@ export function useStacks() {
     } else {
       setUserData(null);
       setNetwork(null);
+      setTycoonUser(null);
     }
   }
 
@@ -51,29 +53,16 @@ export function useStacks() {
     setStxBalance(0);
   }
 
-  async function handleCreateGame(
-    betAmount: number,
-    moveIndex: number,
-    move: Move
-  ) {
+  async function handleRegister(username: string) {
     if (typeof window === "undefined") return;
-    if (moveIndex < 0 || moveIndex > 8) {
-      window.alert("Invalid move. Please make a valid move.");
-      return;
-    }
-    if (betAmount === 0) {
-      window.alert("Please make a bet");
-      return;
-    }
-
     try {
-      if (!userData) throw new Error("User not connected");
-      const txOptions = await createNewGame(betAmount, moveIndex, move);
+      if (!userData || !network) throw new Error("User not connected");
+      const txOptions = await register(network, username);
       await openContractCall({
         ...txOptions,
         onFinish: (data) => {
           console.log(data);
-          window.alert("Sent create game transaction");
+          window.alert("Sent register transaction");
         },
         postConditionMode: PostConditionMode.Allow,
       });
@@ -84,54 +73,16 @@ export function useStacks() {
     }
   }
 
-  async function handleJoinGame(gameId: number, moveIndex: number, move: Move) {
-    if (typeof window === "undefined") return;
-    if (moveIndex < 0 || moveIndex > 8) {
-      window.alert("Invalid move. Please make a valid move.");
-      return;
-    }
-
-    try {
-      if (!userData) throw new Error("User not connected");
-      const txOptions = await joinGame(gameId, moveIndex, move);
-      await openContractCall({
-        ...txOptions,
-        onFinish: (data) => {
-          console.log(data);
-          window.alert("Sent join game transaction");
-        },
-        postConditionMode: PostConditionMode.Allow,
-      });
-    } catch (_err) {
-      const err = _err as Error;
-      console.error(err);
-      window.alert(err.message);
-    }
+  async function checkIfRegistered(): Promise<boolean> {
+    if (!userData || !network) return false;
+    const address = userData.addresses.stx[0].address;
+    return await isRegistered(network, address);
   }
 
-  async function handlePlayGame(gameId: number, moveIndex: number, move: Move) {
-    if (typeof window === "undefined") return;
-    if (moveIndex < 0 || moveIndex > 8) {
-      window.alert("Invalid move. Please make a valid move.");
-      return;
-    }
-
-    try {
-      if (!userData) throw new Error("User not connected");
-      const txOptions = await play(gameId, moveIndex, move);
-      await openContractCall({
-        ...txOptions,
-        onFinish: (data) => {
-          console.log(data);
-          window.alert("Sent play game transaction");
-        },
-        postConditionMode: PostConditionMode.Allow,
-      });
-    } catch (_err) {
-      const err = _err as Error;
-      console.error(err);
-      window.alert(err.message);
-    }
+  async function fetchUserInfo(): Promise<User | null> {
+    if (!userData || !network) return null;
+    const address = userData.addresses.stx[0].address;
+    return await getUser(network, address);
   }
 
   useEffect(() => {
@@ -146,8 +97,12 @@ export function useStacks() {
       getStxBalance(address).then((balance) => {
         setStxBalance(balance);
       });
+
+      // Fetch Tycoon user info
+      fetchUserInfo().then(setTycoonUser);
     } else {
       setStxBalance(0);
+      setTycoonUser(null);
     }
   }, [userData]);
 
@@ -155,10 +110,11 @@ export function useStacks() {
     userData,
     stxBalance,
     network,
+    tycoonUser,
     connectWallet,
     disconnectWallet,
-    handleCreateGame,
-    handleJoinGame,
-    handlePlayGame,
+    handleRegister,
+    checkIfRegistered,
+    fetchUserInfo,
   };
 }
