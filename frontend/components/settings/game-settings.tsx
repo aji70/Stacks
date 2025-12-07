@@ -150,13 +150,13 @@ export default function Page() {
     const toastId = toast.loading("Creating game...", { position: "top-right" });
 
     try {
-      console.log("Calling createGame with settings:", settings);
-      const gameId = await handleCreateAiGame(username!, gameType, playerSymbol, 2, gameCode, Number(settings.startingCash));
+      
+      // const gameId = await handleCreateAiGame(username!, gameType, playerSymbol, 2, gameCode, Number(settings.startingCash));
       // if (!gameId) {
       //   throw new Error("Invalid game ID retrieved");
       // }
       // const gameIdStr = gameId.toString();
-      console.log("Game created with ID:", gameId);
+      // console.log("Game created with ID:", gameId);
 
       // const response = await apiClient.post<ApiResponse>("/games", {
       //   id: gameId,
@@ -175,7 +175,7 @@ export default function Page() {
       //   },
       // });
 
-      alert(`Game created! Code: ${gameCode}`); // Temporary alert for testing
+      // alert(`Game created! Code: ${gameCode}`); // Temporary alert for testing
       toast.update(toastId, {
         render: `Game created! Code: ${gameCode}`,
         type: "success",
@@ -345,7 +345,7 @@ export default function Page() {
         {/* Create Game Button */}
         <div className="flex justify-center mt-10">
           <button
-            onClick={handlePlay}
+            // onClick={handlePlay}
             disabled={isPending || isRegisteredLoading}
             className="px-16 py-5 text-2xl font-orbitron font-bold tracking-wider
                        bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-purple-600 hover:to-pink-600

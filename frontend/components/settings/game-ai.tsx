@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { FaUser, FaBrain, FaCoins, FaRobot, FaRandom } from "react-icons/fa6";
+import { FaUser, FaBrain, FaCoins, FaRobot } from "react-icons/fa6";
+import { FaRandom } from "react-icons/fa";
 import { House } from "lucide-react";
 import {
   Select,
@@ -20,6 +21,7 @@ import { generateGameCode } from "@/lib/utils/games";
 import { GamePieces } from "@/lib/constants/games";
 import { apiClient } from "@/lib/api";
 import { useStacks } from "@/hooks/use-stacks";
+import { ClarityValue, TupleCV, cvToJSON } from "@stacks/transactions";
 
 export default function PlayWithAI() {
   const {
@@ -78,14 +80,26 @@ export default function PlayWithAI() {
         settings.startingCash
       );
 
-      const onChainGameId = await handleGetGameByCode(gameCode);
-      if (!onChainGameId) throw new Error("On-chain game failed");
+
+const onChainGameId: ClarityValue | null = await handleGetGameByCode(gameCode);
+
+if (!onChainGameId) throw new Error("On-chain game failed");
+
+
+const tuple = onChainGameId as TupleCV;
+
+// Access your id safely
+const gameId = (tuple.value.id as any).value; // UIntCV.value is bigint
+
+console.log("Game ID:", gameId);
+
 
       toast.update(toastId, { render: "Saving arena..." });
 
       // SAVE TO BACKEND
-      const saveRes = await apiClient.post<SaveGameResponse>("/games", {
-        id: onChainGameId,
+      // const saveRes = 
+      await apiClient.post<SaveGameResponse>("/games", {
+        id: Number(onChainGameId),
         code: gameCode,
         mode: "PRIVATE",
         address,
@@ -103,8 +117,8 @@ export default function PlayWithAI() {
         },
       });
 
-      const dbGameId = saveRes.data.data?.id;
-      if (!dbGameId) throw new Error("Invalid backend response");
+      // const dbGameId = saveRes.data.data?.id;
+      // if (!dbGameId) throw new Error("Invalid backend response");
 
       toast.update(toastId, {
         render: "Battle begins!",
@@ -113,7 +127,8 @@ export default function PlayWithAI() {
         autoClose: 2000,
       });
 
-      router.push(`/ai-play?gameCode=${gameCode}`);
+      // router.push(`/ai-play?gameCode=${gameCode}`);
+      console.log(`Redirect to /ai-play?gameCode=${gameCode}`);
     } catch (err: any) {
       toast.update(toastId, {
         render: `Error: ${err?.message || "Failed"}`,
