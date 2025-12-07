@@ -1,17 +1,12 @@
 [project]
-name = 'tyc'
+name = 'tycc'
 description = ''
 authors = []
 telemetry = true
 cache_dir = './.cache'
 requirements = []
-[contracts.tyc]
-path = 'contracts/tyc.clar'
-clarity_version = 3
-epoch = 'latest'
-
-[contracts.tyc1]
-path = 'contracts/tyc1.clar'
+[contracts.tycc]
+path = 'contracts/tycc.clar'
 clarity_version = 3
 epoch = 'latest'
 [repl.analysis]

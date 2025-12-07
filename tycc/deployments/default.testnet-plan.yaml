@@ -9,17 +9,10 @@ plan:
     - id: 0
       transactions:
         - contract-publish:
-            contract-name: tyc
+            contract-name: tycc
             expected-sender: ST81CZF1YK81CPAMS6PRS3GJSKK35MGZ2VWEPSEN
-            cost: 3427717
-            path: contracts/tyc.clar
-            anchor-block-only: true
-            clarity-version: 3
-        - contract-publish:
-            contract-name: tyc1
-            expected-sender: ST81CZF1YK81CPAMS6PRS3GJSKK35MGZ2VWEPSEN
-            cost: 3427717
-            path: contracts/tyc1.clar
+            cost: 313577
+            path: contracts/tycc.clar
             anchor-block-only: true
             clarity-version: 3
       epoch: "3.2"

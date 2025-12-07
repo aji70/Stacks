@@ -2,10 +2,13 @@
 import React, { useEffect, useState } from "react";
 import herobg from "@/public/heroBg.png";
 import Image from "next/image";
-import { Dices, BarChart2, Gamepad2, KeyRound } from "lucide-react";
+import { Dices, BarChart2, Gamepad2 } from "lucide-react";
 import { TypeAnimation } from "react-type-animation";
 import { useRouter } from "next/navigation";
 import { useStacks } from "@/hooks/use-stacks"; // Adjust path if necessary
+import { toast } from "react-toastify";
+import { apiClient } from "@/lib/api";
+import { ApiResponse } from "@/types/api"; // Adjust import as needed
 
 const HeroSection: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -18,10 +21,10 @@ const HeroSection: React.FC = () => {
     setGamerName(e.target.value);
   };
 
-  const handleRouteToPrivateRoom = () => router.push("/game-settings");
   const handleRouteToJoinRoom = () => router.push("/join-room");
   const handleRouteToCreateGame = () => router.push("/game-settings");
   const handleRouteToGameStats = () => router.push("/game-stats");
+  const handleRouteToPlayWithAI = () => router.push("/play-ai");
 
   const handleConnectWallet = async () => {
     setIsConnecting(true);
@@ -32,21 +35,105 @@ const HeroSection: React.FC = () => {
     }
   };
 
-  const handleRegisterUser = async () => {
-    if (gamerName.trim() === "") return; // Simple client-side check
-    setLoading(true);
-    try {
-      await handleRegister(gamerName);
-      // Refetch user info after registration (note: may need delay or polling for tx confirmation)
-      setTimeout(async () => {
-        const updatedUser = await fetchUserInfo();
-        // Assuming the hook will update tycoonUser, but for immediate effect, we can log or handle
-        console.log("Refetched user:", updatedUser);
-      }, 3000); // Delay to allow tx to mine (hacky, improve with polling if needed)
-    } finally {
-      setLoading(false);
+const handleRegisterUser = async () => {
+  if (gamerName.trim() === "") {
+    toast.error("Please enter a username", {
+      position: "top-right",
+      autoClose: 5000,
+    });
+    return;
+  }
+
+  if (!userData) {
+    toast.error("Please connect your wallet", {
+      position: "top-right",
+      autoClose: 5000,
+    });
+    return;
+  }
+
+  setLoading(true);
+
+  const toastId = toast.loading("Registering on blockchain...", {
+    position: "top-right",
+  });
+
+  try {
+    // 1️⃣ Register on-chain (wait for user to sign)
+    const txId = await handleRegister(gamerName);
+
+    if (!txId) {
+      toast.update(toastId, {
+        render: "Transaction canceled or failed",
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
+      return;
     }
-  };
+
+    toast.update(toastId, {
+      render: "Transaction sent. Waiting for confirmation...",
+      type: "info",
+      isLoading: true,
+    });
+
+    // 3️⃣ Call backend API to save user
+    const address = userData.addresses.stx[0].address;
+    const res = await apiClient.post<ApiResponse>("/users", {
+      username: gamerName,
+      address: address,
+      chain: "Base",
+    });
+
+    if (res?.data?.success) {
+      toast.update(toastId, {
+        render: "Registration successful!",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+        onClose: () => {
+          // Refetch user info after successful registration
+          fetchUserInfo();
+          router.refresh();
+        },
+      });
+    } else {
+      toast.update(toastId, {
+        render: "Failed to register on backend. Please try again.",
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
+    }
+
+  } catch (err: unknown) {
+    console.error("Registration error:", err);
+    const errorMessage =
+      err instanceof Error
+        ? err.message
+        : typeof err === "string"
+        ? err
+        : "Failed to register. Please try again.";
+
+    toast.update(toastId, {
+      render: errorMessage,
+      type: "error",
+      isLoading: false,
+      autoClose: 5000,
+    });
+
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  useEffect(() => {
+    if (userData && !tycoonUser) {
+      // Optionally fetch or set initial state
+    }
+  }, [userData, tycoonUser]);
 
   if (isConnecting) {
     return (
@@ -100,6 +187,8 @@ const HeroSection: React.FC = () => {
               1200,
               "Conquer • Build • Trade On",
               1800,
+              "Play Solo vs AI",
+              2000,
               "Conquer • Build",
               1000,
               "Conquer",
@@ -122,13 +211,15 @@ const HeroSection: React.FC = () => {
         <div className="w-full px-4 md:w-[70%] lg:w-[55%] text-center text-[#F0F7F7] -tracking-[2%]">
           <TypeAnimation
             sequence={[
-              "Roll the dice 🎲",
+              "Roll the dice",
               2000,
-              "Buy properties 🏠",
+              "Buy properties",
               2000,
-              "Collect rent 💰",
+              "Collect rent",
               2000,
-              "Become the top tycoon 👑",
+              "Play against AI opponents",
+              2200,
+              "Become the top tycoon",
               2000,
             ]}
             wrapper="span"
@@ -138,8 +229,9 @@ const HeroSection: React.FC = () => {
           />
           <p className="font-dmSans font-[400] md:text-[18px] text-[14px] text-[#F0F7F7] mt-4">
             Step into Tycoon — the Web3 twist on the classic game of
-            strategy, ownership, and fortune. Collect tokens, complete quests,
-            and become the ultimate blockchain tycoon.
+            strategy, ownership, and fortune. Play solo against AI, compete in
+            multiplayer rooms, collect tokens, complete quests, and become the
+            ultimate blockchain tycoon.
           </p>
         </div>
         <div className="z-1 w-full flex flex-col justify-center items-center mt-3 gap-3">
@@ -343,6 +435,46 @@ const HeroSection: React.FC = () => {
                 <span className="absolute inset-0 flex items-center justify-center text-[#00F0FF] capitalize text-[12px] font-dmSans font-medium z-2">
                   <BarChart2 className="mr-1.5 w-[16px] h-[16px]" />
                   Game Stats
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={handleRouteToPlayWithAI}
+                className="relative group w-[227px] h-[40px] bg-transparent border-none p-0 overflow-hidden cursor-pointer"
+              >
+                <svg
+                  width="227"
+                  height="40"
+                  viewBox="0 0 227 40"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="absolute top-0 left-0 w-full h-full transform scale-x-[-1] scale-y-[-1]"
+                >
+                  <path
+                    d="M6 1H221C225.373 1 227.996 5.85486 225.601 9.5127L207.167 37.5127C206.151 39.0646 204.42 40 202.565 40H6C2.96244 40 0.5 37.5376 0.5 34.5V6.5C0.5 3.46243 2.96243 1 6 1Z"
+                    fill="#003B3E"
+                    stroke="#003B3E"
+                    strokeWidth={1}
+                    className="group-hover:stroke-[#00F0FF] transition-all duration-300 ease-in-out group-hover:fill-[#00F0FF]/10"
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-[#00F0FF] capitalize text-[12px] font-dmSans font-medium z-2">
+                  <svg
+                    className="mr-2 w-5 h-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3" y="11" width="18" height="10" rx="2" />
+                    <circle cx="9" cy="15" r="1.5" />
+                    <circle cx="15" cy="15" r="1.5" />
+                    <path d="M9 11v-1a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1" />
+                    <path d="M12 17v4" />
+                  </svg>
+                  Play with AI
                 </span>
               </button>
             </div>

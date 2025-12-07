@@ -1,4 +1,4 @@
-import { register, isRegistered, getUser, User } from "@/lib/tycoon";
+import { register, getGame, createAiGame, isRegistered, getUser, User, getGameByCode } from "@/lib/tycoon";
 import { getStxBalance } from "@/lib/stx-utils";
 import {
   connect,
@@ -18,6 +18,8 @@ type UserData = {
 };
 
 type Network = "mainnet" | "testnet" | null;
+
+    
 
 export function useStacks() {
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -53,25 +55,92 @@ export function useStacks() {
     setStxBalance(0);
   }
 
-  async function handleRegister(username: string) {
-    if (typeof window === "undefined") return;
-    try {
-      if (!userData || !network) throw new Error("User not connected");
-      const txOptions = await register(network, username);
-      await openContractCall({
+async function handleRegister(username: string): Promise<string | undefined> {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (!userData || !network) throw new Error("User not connected");
+    const txOptions = await register(network, username);
+
+    return await new Promise<string | undefined>((resolve) => {
+      openContractCall({
         ...txOptions,
-        onFinish: (data) => {
-          console.log(data);
-          window.alert("Sent register transaction");
-        },
         postConditionMode: PostConditionMode.Allow,
+        onFinish: (data) => {
+          console.log("TX sent:", data);
+          window.alert("Sent register transaction");
+          resolve(data.txId); // return the transaction ID
+        },
+        onCancel: () => {
+          console.log("User canceled registration");
+          resolve(undefined);
+        },
       });
-    } catch (_err) {
-      const err = _err as Error;
-      console.error(err);
-      window.alert(err.message);
-    }
+    });
+  } catch (err: unknown) {
+    console.error(err);
+    const message = err instanceof Error ? err.message : String(err);
+    window.alert(message);
+    return undefined;
   }
+}
+
+async function handleGetGameByCode(gameCode: string) {
+  if (!userData || !network) return null;
+  return await getGameByCode(network, gameCode);
+  
+}
+
+
+async function handleCreateAiGame(
+  username: string,
+  gameType: number,
+  playerSymbol: number,
+  numberOfAiPlayers: number,
+  code: string,
+  startingBalance: number
+): Promise<string | undefined> {
+
+  if (typeof window === "undefined") return;
+
+  try {
+    if (!userData || !network) throw new Error("User not connected");
+
+    const txOptions = await createAiGame(
+      network,
+      username,
+      gameType,
+      playerSymbol,
+      numberOfAiPlayers,
+      code,
+      startingBalance
+    );
+
+    return await new Promise<string | undefined>((resolve, reject) => {
+      openContractCall({
+        ...txOptions,
+        postConditionMode: PostConditionMode.Allow,
+        onFinish: (data) => {
+          console.log("TX sent:", data);
+          resolve(data.txId);   // ⭐ RETURN txId
+        },
+        onCancel: () => {
+          console.log("User canceled");
+          resolve(undefined);
+        }
+      });
+    });
+
+  } catch (err: unknown) {
+    console.error(err);
+    const message = err instanceof Error ? err.message : String(err);
+    window.alert(message);
+    return undefined;
+  }
+}
+
+
+ 
 
   async function checkIfRegistered(): Promise<boolean> {
     if (!userData || !network) return false;
@@ -84,6 +153,11 @@ export function useStacks() {
     const address = userData.addresses.stx[0].address;
     return await getUser(network, address);
   }
+
+  async function fetchGameInfo(gameid: number) {
+    if (!userData || !network) return null;
+    return await getGame(network, gameid);
+  } 
 
   useEffect(() => {
     if (isConnected()) {
@@ -116,5 +190,8 @@ export function useStacks() {
     handleRegister,
     checkIfRegistered,
     fetchUserInfo,
+    handleCreateAiGame,
+    fetchGameInfo,
+    handleGetGameByCode,
   };
 }
