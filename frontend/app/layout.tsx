@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Toaster } from "react-hot-toast";
+import Providers from "./provider";
 
 export const metadata = getMetadata({
   title: "Tycoon",
@@ -16,9 +17,9 @@ export const metadata = getMetadata({
 
 export default async function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   const headersObj = await headers();
   const cookies = headersObj.get("cookie");
 
@@ -29,28 +30,34 @@ export default async function RootLayout({
       className={`${orbitron.variable} ${dmSans.variable} ${kronaOne.variable}`}
     >
       <body className="antialiased bg-[#010F10] w-full">
-        <NavBar />
-        {children}
-        <ScrollToTopBtn />
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="dark"
-          toastStyle={{
-            fontFamily: "Orbitron, sans-serif",
-            background: "#0E1415",
-            color: "#00F0FF",
-            border: "1px solid #003B3E",
-          }}
-        />
-        <Toaster position="top-center" />
+
+        {/* React Query Provider now wraps the app */}
+        <Providers>
+          <NavBar />
+          {children}
+          <ScrollToTopBtn />
+
+          <ToastContainer
+            position="top-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="dark"
+            toastStyle={{
+              fontFamily: "Orbitron, sans-serif",
+              background: "#0E1415",
+              color: "#00F0FF",
+              border: "1px solid #003B3E",
+            }}
+          />
+
+          <Toaster position="top-center" />
+        </Providers>
       </body>
     </html>
   );
