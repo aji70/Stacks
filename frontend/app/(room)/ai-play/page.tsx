@@ -92,7 +92,7 @@ const {
     
     console.log("GAME PROPERTIES RESPONSE:", res);
     
-    return res.data?.success ? res.data.data : [];
+    return res.success ? res.data : [];
   },
   enabled: !!game?.id,
   refetchInterval: 15000,
