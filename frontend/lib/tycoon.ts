@@ -176,6 +176,63 @@ export async function createAiGame(
 
   return txOptions;
 }
+
+
+export async function createGame(
+  networkName: 'mainnet' | 'testnet' = 'testnet',
+  gameType: number,
+  playerSymbol: number,
+  numberOfPlayers: number,
+  code: string,
+  startingBalance: number,
+  betAmount: number
+) {
+  // Client-side validation (mirrors contract checks)
+  // const usernameBytes = new TextEncoder().encode(creatorUsername).length;
+  // if (usernameBytes === 0 || usernameBytes > 32) {
+  //   throw new Error("Username must be 1-32 characters long");
+  // }
+  const codeBytes = new TextEncoder().encode(code).length;
+  if (codeBytes === 0 || codeBytes > 32) {
+    throw new Error("Code must be 1-32 characters long");
+  }
+
+  const txOptions = {
+    contractAddress: TYCOON_CONTRACT_ADDRESS,
+    contractName: TYCOON_CONTRACT_NAME,
+    functionName: "create-game",
+    functionArgs: [    
+      uintCV(gameType),
+      uintCV(playerSymbol),
+      uintCV(numberOfPlayers),
+      stringAsciiCV(code),
+      uintCV(startingBalance),
+      uintCV(betAmount),
+    ],
+    network: networkName,
+  };
+
+  return txOptions;
+}
+export async function joinGame(
+  networkName: 'mainnet' | 'testnet' = 'testnet',
+  gameId: number,
+  playerSymbol: number,
+) {
+
+  const txOptions = {
+    contractAddress: TYCOON_CONTRACT_ADDRESS,
+    contractName: TYCOON_CONTRACT_NAME,
+    functionName: "join-game",
+    functionArgs: [    
+      uintCV(gameId),
+      uintCV(playerSymbol),
+    ],
+    network: networkName,
+  };
+
+  return txOptions;
+}
 function uintCV(value: number): UIntCV {
   if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
     throw new Error("uintCV expects a non-negative integer");

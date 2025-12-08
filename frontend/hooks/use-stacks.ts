@@ -1,4 +1,4 @@
-import { register, getGame, createAiGame, isRegistered, getUser, User, getGameByCode } from "@/lib/tycoon";
+import { register, getGame, createAiGame, isRegistered, getUser, User, getGameByCode, createGame, joinGame } from "@/lib/tycoon";
 import { getStxBalance } from "@/lib/stx-utils";
 import {
   connect,
@@ -139,6 +139,92 @@ async function handleCreateAiGame(
   }
 }
 
+async function handleCreateGame(
+  gameType: number,
+  playerSymbol: number,
+  numberOfPlayers: number,
+  code: string,
+  startingBalance: number,
+  betAmount: number
+): Promise<string | undefined> {
+
+  if (typeof window === "undefined") return;
+
+  try {
+    if (!userData || !network) throw new Error("User not connected");
+
+    const txOptions = await createGame(
+      network,
+      gameType,
+      playerSymbol,
+      numberOfPlayers,
+      code,
+      startingBalance,
+      betAmount
+    );
+
+    return await new Promise<string | undefined>((resolve, reject) => {
+      openContractCall({
+        ...txOptions,
+        postConditionMode: PostConditionMode.Allow,
+        onFinish: (data) => {
+          console.log("TX sent:", data);
+          resolve(data.txId);   // ⭐ RETURN txId
+        },
+        onCancel: () => {
+          console.log("User canceled");
+          resolve(undefined);
+        }
+      });
+    });
+
+  } catch (err: unknown) {
+    console.error(err);
+    const message = err instanceof Error ? err.message : String(err);
+    window.alert(message);
+    return undefined;
+  }
+}
+
+async function handleJoinGamee(
+  gameId: number,
+  playerSymbol: number,
+): Promise<string | undefined> {
+
+  if (typeof window === "undefined") return;
+
+  try {
+    if (!userData || !network) throw new Error("User not connected");
+
+    const txOptions = await joinGame(
+      network,
+      gameId,
+      playerSymbol,
+    );
+
+    return await new Promise<string | undefined>((resolve, reject) => {
+      openContractCall({
+        ...txOptions,
+        postConditionMode: PostConditionMode.Allow,
+        onFinish: (data) => {
+          console.log("TX sent:", data);
+          resolve(data.txId);   // ⭐ RETURN txId
+        },
+        onCancel: () => {
+          console.log("User canceled");
+          resolve(undefined);
+        }
+      });
+    });
+
+  } catch (err: unknown) {
+    console.error(err);
+    const message = err instanceof Error ? err.message : String(err);
+    window.alert(message);
+    return undefined;
+  }
+}
+
 
  
 
@@ -193,5 +279,7 @@ async function handleCreateAiGame(
     handleCreateAiGame,
     fetchGameInfo,
     handleGetGameByCode,
+    handleCreateGame,
+    handleJoinGamee,
   };
 }

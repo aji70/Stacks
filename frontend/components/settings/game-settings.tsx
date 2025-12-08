@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { FaUsers, FaUser } from "react-icons/fa6";
+import { FaUsers, FaUser, FaCoins } from "react-icons/fa6";
 import { House } from "lucide-react";
 import {
   Select,
@@ -22,109 +22,82 @@ import { toast } from "react-toastify";
 import { generateGameCode } from "@/lib/utils/games";
 import { GamePieces } from "@/lib/constants/games";
 import { apiClient } from "@/lib/api";
-import { ApiResponse } from "@/types/api";
 import { useStacks } from "@/hooks/use-stacks"; 
+import { ClarityValue, TupleCV, UIntCV } from "@stacks/transactions";
 
 interface Settings {
   code: string;
-  symbol: string;
-  maxPlayers: string;
+  symbol: number;
+  maxPlayers: number;
   privateRoom: boolean;
   auction: boolean;
   rentInPrison: boolean;
   mortgage: boolean;
   evenBuild: boolean;
-  startingCash: string;
+  startingCash: number;
   randomPlayOrder: boolean;
 }
 
+type SaveGameResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    id: number;
+  };
+};
+
 export default function Page() {
   const router = useRouter();
-  const { userData, tycoonUser, checkIfRegistered, handleCreateAiGame } = useStacks();
+  const { userData, tycoonUser, checkIfRegistered, handleCreateGame, handleGetGameByCode } = useStacks();
   const address = userData?.addresses?.stx?.[0]?.address;
 
   const [settings, setSettings] = useState<Settings>({
     code: generateGameCode(),
-    symbol: "hat",
-    maxPlayers: "2",
+    symbol: 1,
+    maxPlayers: 2,
     privateRoom: false,
     auction: false,
     rentInPrison: false,
     mortgage: false,
     evenBuild: false,
-    startingCash: "1500",
+    startingCash: 1500,
     randomPlayOrder: false,
   });
 
   // New states for loading/pending
   const [isPending, setIsPending] = useState(false);
-  const [isRegisteredLoading, setIsRegisteredLoading] = useState(true); // Start as true if checking on mount
-  const [isRegistered, setIsRegistered] = useState(false); // Store the result separately
-
+  const [isRegisteredLoading, setIsRegisteredLoading] = useState(false); // Start as true if checking on mount
+  const [isRegistered, setIsRegistered] = useState(true); // Store the result separately
+  const [displayBetAmount, setDisplayBetAmount] = useState(1); // Display in STX
+  const gameCode = settings.code;
+  const playerSymbol = settings.symbol;
+  const numberOfPlayers = settings.maxPlayers;
+  const username = tycoonUser?.username;
   
 
-  let gameType: number;
-  if (settings.privateRoom) {
-    gameType = 1; // PRIVATE
-  } else {
-    gameType = 0; // PUBLIC
-  }
-  const gameCode = settings.code;
-  // const playerSymbol = settings.symbol;
-
-  let playerSymbol: number;
-  switch (settings.symbol) {
-    case "car":
-      playerSymbol = 0;
-      break;
-    case "hat":
-      playerSymbol = 1;
-      break;
-    case "dog":
-      playerSymbol = 2;
-      break;
-    case "boat":
-      playerSymbol = 3;
-      break;
-    case "shoe":
-      playerSymbol = 4;
-      break;
-    case "thimble":
-      playerSymbol = 5;
-      break;
-    case "cat":
-      playerSymbol = 6;
-      break;
-    case "wheelbarrow":
-      playerSymbol = 7;
-      break;
-    default:
-      playerSymbol = 1; // Default to hat
-  }
-  const numberOfPlayers = Number.parseInt(settings.maxPlayers, 10);
-  const username = tycoonUser?.username;
-
   // Run the registration check on component mount (async if needed)
-  useEffect(() => {
-    const checkRegistration = async () => {
-      setIsRegisteredLoading(true);
-      try {
-        const registered = await checkIfRegistered(); // Assume it can be async; if not, remove await
-        setIsRegistered(registered);
-      } catch (error) {
-        console.error("Error checking registration:", error);
-        toast.error("Failed to check registration. Please try again.");
-        setIsRegistered(false); // Default to false on error
-      } finally {
-        setIsRegisteredLoading(false);
-      }
-    };
-    checkRegistration();
-  }, [checkIfRegistered]); // Dependency on the function
+  // useEffect(() => {
+  //   const checkRegistration = async () => {
+  //     setIsRegisteredLoading(true);
+  //     try {
+  //       const registered = await checkIfRegistered(); // Assume it can be async; if not, remove await
+
+  //       setIsRegistered(registered);
+  //     } catch (error) {
+  //       console.error("Error checking registration:", error);
+  //       toast.error("Failed to check registration. Please try again.");
+  //       setIsRegistered(false); // Default to false on error
+  //     } finally {
+  //       setIsRegisteredLoading(false);
+  //     }
+  //   };
+  //   checkRegistration();
+  // }, [checkIfRegistered]); // Dependency on the function
+  
 
   const handleSettingChange = (
     key: keyof Settings,
-    value: string | boolean
+    value: Settings[keyof Settings]
   ) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
@@ -135,10 +108,10 @@ export default function Page() {
       return;
     }
 
-      if (!userData || !userData.addresses?.stx?.length) {
-    console.error("User data not available");
-    return;
-  }
+    if (!userData || !userData.addresses?.stx?.length) {
+      console.error("User data not available");
+      return;
+    }
 
     if (!isRegistered) {
       toast.error("Please register before creating a game", { position: "top-right", autoClose: 5000 });
@@ -146,60 +119,75 @@ export default function Page() {
       return;
     }
 
+    const betAmount = Math.round(displayBetAmount * 1000000); // Convert STX to microstacks
+
     setIsPending(true); // Start pending state
     const toastId = toast.loading("Creating game...", { position: "top-right" });
 
     try {
-      
-      // const gameId = await handleCreateAiGame(username!, gameType, playerSymbol, 2, gameCode, Number(settings.startingCash));
-      // if (!gameId) {
-      //   throw new Error("Invalid game ID retrieved");
-      // }
-      // const gameIdStr = gameId.toString();
-      // console.log("Game created with ID:", gameId);
+      const gameType = settings.privateRoom ? 1 : 0;
+      await handleCreateGame(gameType, playerSymbol, numberOfPlayers, gameCode, settings.startingCash, betAmount);
 
-      // const response = await apiClient.post<ApiResponse>("/games", {
-      //   id: gameId,
-      //   code: gameCode,
-      //   mode: gameType,
-      //   address,
-      //   symbol: playerSymbol,
-      //   number_of_players: numberOfPlayers,
-      //   settings: {
-      //     auction: settings.auction,
-      //     rent_in_prison: settings.rentInPrison,
-      //     mortgage: settings.mortgage,
-      //     even_build: settings.evenBuild,
-      //     starting_cash: Number(settings.startingCash),
-      //     randomize_play_order: settings.randomPlayOrder,
-      //   },
-      // });
+      // Add 3-second delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // alert(`Game created! Code: ${gameCode}`); // Temporary alert for testing
+      const onChainGameId: ClarityValue | null = await handleGetGameByCode(gameCode);
+
+      if (!onChainGameId) throw new Error("On-chain game failed");
+
+      const tuple = onChainGameId as TupleCV;
+
+      // Access your id safely with proper type casting
+      const gameId = ((tuple.value as { id: UIntCV }).id).value; // Assuming tuple.value is an object with 'id' as UIntCV
+
+      toast.update(toastId, { render: "Saving arena..." });
+
+      const saveRes = await apiClient.post<SaveGameResponse>("/games", {
+        id: Number(gameId),
+        code: gameCode,
+        mode: settings.privateRoom ? "PRIVATE" : "PUBLIC",
+        address,
+        symbol: playerSymbol,
+        number_of_players: numberOfPlayers,
+        bet_amount: betAmount,
+        settings: {
+          auction: settings.auction,
+          rent_in_prison: settings.rentInPrison,
+          mortgage: settings.mortgage,
+          even_build: settings.evenBuild,
+          starting_cash: settings.startingCash,
+          randomize_play_order: settings.randomPlayOrder,
+        },
+      });
+
+      const dbGameId = saveRes.data?.id ?? saveRes.data;
+      if (!dbGameId) throw new Error("Invalid backend response");
+
       toast.update(toastId, {
         render: `Game created! Code: ${gameCode}`,
         type: "success",
         isLoading: false,
-        autoClose: 3000,
-        onClose: () => {
-          // setTimeout(() => router.push(`/game-waiting?gameCode=${gameCode}`), 100);
-        },
+        autoClose: 2000,
       });
+
+      localStorage.setItem("gameCode", gameCode);
+
+      router.push(`/game-waiting?gameCode=${gameCode}`);
     } catch (err: unknown) {
-  console.error("Error creating game:", err);
+      console.error("Error creating game:", err);
 
-  const message =
-    err instanceof Error ? err.message : "Failed to create game. Please try again.";
+      const message =
+        err instanceof Error ? err.message : "Failed to create game. Please try again.";
 
-  toast.update(toastId, {
-    render: message,
-    type: "error",
-    isLoading: false,
-    autoClose: 5000,
-  });
-} finally {
-  setIsPending(false);
-}
+      toast.update(toastId, {
+        render: message,
+        type: "error",
+        isLoading: false,
+        autoClose: 5000,
+      });
+    } finally {
+      setIsPending(false);
+    }
   };
 
   if (isRegisteredLoading) {
@@ -218,10 +206,10 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-settings bg-cover bg-fixed flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-black/60 backdrop-blur-xl rounded-2xl border border-cyan-500/50 shadow-2xl p-6 md:p-10">
+      <div className="w-full max-w-3xl bg-black/60 backdrop-blur-xl rounded-2xl border border-cyan-500/50 shadow-2xl p-6">
 
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
           <button
             onClick={() => router.push("/")}
             className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 transition"
@@ -229,44 +217,44 @@ export default function Page() {
             <House className="w-4 h-4" />
             <span className="font-medium text-sm">BACK</span>
           </button>
-          <h1 className="text-3xl md:text-4xl font-orbitron font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-orbitron font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
             CREATE GAME
           </h1>
-          <div className="w-16" />
+          <div className="w-20" />
         </div>
 
         {/* Main Grid */}
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-4 mb-6">
 
           {/* Left Column – Core Settings */}
-          <div className="space-y-5">
+          <div className="space-y-4">
 
             {/* Avatar */}
-            <div className="bg-gradient-to-br from-cyan-900/50 to-blue-900/50 rounded-xl p-5 border border-cyan-500/30">
-              <div className="flex items-center gap-2 mb-3">
-                <FaUser className="w-6 h-6 text-cyan-400" />
-                <h3 className="text-xl font-bold text-cyan-300">Your Piece</h3>
+            <div className="p-4 rounded-xl border border-cyan-500/30 bg-gradient-to-br from-cyan-900/50 to-blue-900/50">
+              <div className="flex items-center gap-2 mb-2">
+                <FaUser className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-lg text-cyan-300 font-bold">Your Piece</h3>
               </div>
-              <Select value={settings.symbol} onValueChange={v => handleSettingChange("symbol", v)}>
-                <SelectTrigger className="h-12 bg-black/40 border-cyan-500/50 text-white text-base">
+              <Select value={String(settings.symbol)} onValueChange={v => handleSettingChange("symbol", Number(v))}>
+                <SelectTrigger className="h-10 bg-black/40 border-cyan-500/50 text-white text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {GamePieces.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    <SelectItem key={p.id} value={String(p.value)}>{p.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             {/* Max Players */}
-            <div className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 rounded-xl p-5 border border-purple-500/30">
-              <div className="flex items-center gap-2 mb-3">
-                <FaUsers className="w-6 h-6 text-purple-400" />
-                <h3 className="text-xl font-bold text-purple-300">Max Players</h3>
+            <div className="p-4 rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-900/50 to-pink-900/50">
+              <div className="flex items-center gap-2 mb-2">
+                <FaUsers className="w-5 h-5 text-purple-400" />
+                <h3 className="text-lg text-purple-300 font-bold">Max Players</h3>
               </div>
-              <Select value={settings.maxPlayers} onValueChange={v => handleSettingChange("maxPlayers", v)}>
-                <SelectTrigger className="h-12 bg-black/40 border-purple-500/50 text-white text-base">
+              <Select value={String(settings.maxPlayers)} onValueChange={v => handleSettingChange("maxPlayers", Number(v))}>
+                <SelectTrigger className="h-10 bg-black/40 border-purple-500/50 text-white text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -278,11 +266,11 @@ export default function Page() {
             </div>
 
             {/* Private Room */}
-            <div className="bg-gradient-to-br from-emerald-900/50 to-teal-900/50 rounded-xl p-5 border border-emerald-500/30">
+            <div className="p-4 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-900/50 to-teal-900/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <MdPrivateConnectivity className="w-6 h-6 text-emerald-400" />
-                  <h3 className="text-xl font-bold text-emerald-300">Private Room</h3>
+                  <MdPrivateConnectivity className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-lg text-emerald-300 font-bold">Private Room</h3>
                 </div>
                 <Switch
                   checked={settings.privateRoom}
@@ -293,13 +281,13 @@ export default function Page() {
             </div>
 
             {/* Starting Cash */}
-            <div className="bg-gradient-to-br from-yellow-900/50 to-amber-900/50 rounded-xl p-5 border border-yellow-500/30">
-              <div className="flex items-center gap-2 mb-3">
-                <FaHandHoldingDollar className="w-6 h-6 text-yellow-400" />
-                <h3 className="text-xl font-bold text-yellow-300">Starting Cash</h3>
+            <div className="p-4 rounded-xl border border-yellow-500/30 bg-gradient-to-br from-yellow-900/50 to-amber-900/50">
+              <div className="flex items-center gap-2 mb-2">
+                <FaHandHoldingDollar className="w-5 h-5 text-yellow-400" />
+                <h3 className="text-lg text-yellow-300 font-bold">Starting Cash</h3>
               </div>
-              <Select value={settings.startingCash} onValueChange={v => handleSettingChange("startingCash", v)}>
-                <SelectTrigger className="h-12 bg-black/40 border-yellow-500/50 text-white text-base">
+              <Select value={String(settings.startingCash)} onValueChange={v => handleSettingChange("startingCash", Number(v))}>
+                <SelectTrigger className="h-10 bg-black/40 border-yellow-500/50 text-white text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -312,51 +300,66 @@ export default function Page() {
               </Select>
             </div>
 
+            {/* Bet Amount */}
+            <div className="p-4 rounded-xl border border-red-500/30 bg-gradient-to-br from-red-900/50 to-orange-900/50">
+              <div className="flex items-center gap-2 mb-2">
+                <FaCoins className="w-5 h-5 text-red-400" />
+                <h3 className="text-lg text-red-300 font-bold">Bet Amount (STX)</h3>
+              </div>
+              <input
+                type="number"
+                step="0.01"
+                value={displayBetAmount}
+                onChange={(e) => setDisplayBetAmount(Number(e.target.value))}
+                className="h-10 w-full bg-black/40 border-red-500/50 text-white px-3 rounded-md text-sm"
+              />
+            </div>
+
           </div>
 
           {/* Right Column – House Rules */}
-          <div className="bg-black/70 rounded-xl p-6 border border-cyan-500/40">
-            <h3 className="text-2xl font-orbitron font-bold text-cyan-300 mb-6 text-center">
+          <div className="bg-black/70 rounded-xl p-5 border border-cyan-500/40">
+            <h3 className="text-xl font-orbitron font-bold text-cyan-300 mb-4 text-center">
               HOUSE RULES
             </h3>
-            <div className="space-y-5">
+            <div className="space-y-3">
               {[
-                { icon: RiAuctionFill, label: "Auction", key: "auction" },
-                { icon: GiPrisoner, label: "Rent in Jail", key: "rentInPrison" },
-                { icon: GiBank, label: "Mortgage", key: "mortgage" },
-                { icon: IoBuild, label: "Even Build", key: "evenBuild" },
-                { icon: FaRandom, label: "Random Order", key: "randomPlayOrder" },
-              ].map(item => (
-                <div key={item.key} className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <item.icon className="w-7 h-7 text-cyan-400" />
-                    <span className="text-white text-lg font-medium">{item.label}</span>
+                { icon: RiAuctionFill, label: "Auction", key: "auction" as const },
+                { icon: GiPrisoner, label: "Rent in Jail", key: "rentInPrison" as const },
+                { icon: GiBank, label: "Mortgage", key: "mortgage" as const },
+                { icon: IoBuild, label: "Even Build", key: "evenBuild" as const },
+                { icon: FaRandom, label: "Random Order", key: "randomPlayOrder" as const },
+              ].map(item => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.key} className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <Icon className="w-5 h-5 text-cyan-400" />
+                      <span className="text-white text-base font-medium">{item.label}</span>
+                    </div>
+                    <Switch
+                      checked={settings[item.key]}
+                      onCheckedChange={v => handleSettingChange(item.key, v)}
+                    />
                   </div>
-                  <Switch
-                    checked={settings[item.key as keyof Settings] as boolean}
-                    onCheckedChange={v => handleSettingChange(item.key as keyof Settings, v)}
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
 
         {/* Create Game Button */}
-        <div className="flex justify-center mt-10">
+        <div className="flex justify-center mt-6">
           <button
-            // onClick={handlePlay}
+            onClick={handlePlay}
             disabled={isPending || isRegisteredLoading}
-            className="px-16 py-5 text-2xl font-orbitron font-bold tracking-wider
+            className="px-12 py-4 text-xl font-orbitron font-bold tracking-wider
                        bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-purple-600 hover:to-pink-600
-                       rounded-xl shadow-2xl transform hover:scale-105 transition-all duration-300
-                       disabled:opacity-60 disabled:cursor-not-allowed
-                       border-4 border-cyan-400/80 relative overflow-hidden"
+                       rounded-xl shadow-xl transform hover:scale-105 transition-all duration-300
+                       border-4 border-cyan-400/80 relative overflow-hidden
+                       disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <span className="relative z-10 text-black drop-shadow-lg">
-              {isPending ? "CREATING..." : "CREATE GAME"}
-            </span>
-            <div className="absolute inset-0 bg-white opacity-0 hover:opacity-30 transition-opacity" />
+            {isPending ? "CREATING..." : "CREATE GAME"}
           </button>
         </div>
 

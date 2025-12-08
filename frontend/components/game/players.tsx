@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Game, GameProperty, Player, Property } from "@/types/game";
-// import { useAccount } from "wagmi";
+import { useStacks } from "@/hooks/use-stacks";
 import { getPlayerSymbol } from "@/lib/types/symbol";
 import toast from "react-hot-toast";
 import { apiClient } from "@/lib/api";
@@ -23,7 +23,9 @@ export default function GamePlayers({
   my_properties,
   me,
 }: GamePlayersProps) {
-  const { address } = useAccount();
+   const {userData} = useStacks();
+    const address = userData?.addresses?.stx?.[0]?.address;
+  
   const [showEmpire, setShowEmpire] = useState(false);
   const [showTrade, setShowTrade] = useState(false);
   const [openTrades, setOpenTrades] = useState<any[]>([]);

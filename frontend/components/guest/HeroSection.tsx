@@ -411,7 +411,7 @@ const handleRegisterUser = async () => {
                   Join Room
                 </span>
               </button>
-              <button
+              {/* <button
                 type="button"
                 onClick={handleRouteToGameStats}
                 className="relative group w-[227px] h-[40px] bg-transparent border-none p-0 overflow-hidden cursor-pointer"
@@ -436,7 +436,7 @@ const handleRegisterUser = async () => {
                   <BarChart2 className="mr-1.5 w-[16px] h-[16px]" />
                   Game Stats
                 </span>
-              </button>
+              </button> */}
               <button
                 type="button"
                 onClick={handleRouteToPlayWithAI}

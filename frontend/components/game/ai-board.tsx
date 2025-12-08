@@ -233,7 +233,7 @@ const fetchUpdatedGame = useCallback(async () => {
       `/games/code/${game.code}`
     );
 
-    console.log("Fetched updated game data:", res.data);
+    console.log("Fetched updated gameconst address = userData?.profile?.stxAddress?.mainnet || null; data:", res.data);
 
     if (res.success && res.data?.players) {
       setPlayers(res.data.players);
@@ -295,6 +295,7 @@ const fetchUpdatedGame = useCallback(async () => {
       setTimeout(END_TURN, 1000);
     } catch (err) {
       showToast("Purchase failed", "error");
+      console.log("BUY PROPERTY ERROR:", err);
     }
   }, [currentPlayer, properties, game_properties, game.id, fetchUpdatedGame, actionLock, END_TURN, showToast]);
 
