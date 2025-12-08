@@ -69,8 +69,8 @@ const {
   queryKey: ["properties"],
   queryFn: async () => {
     const res = await apiClient.get<ApiResponse>("/properties");
-    console.log("PROPERTIES RESPONSE:", res.data);
-    return res.data?.success ? res.data.data : [];
+    console.log("PROPERTIES RESPONSE:", res);
+    return res?.success ? res.data : [];
   }
 });
 
@@ -153,9 +153,6 @@ const {
     </main>
   ) : (
     <>
-    <div className="w-full min-h-screen flex items-center justify-center text-lg font-medium text-white">
-      Loading game data...
-    </div>
     </>
   );
 }
