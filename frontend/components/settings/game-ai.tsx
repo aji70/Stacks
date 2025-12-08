@@ -21,7 +21,7 @@ import { generateGameCode } from "@/lib/utils/games";
 import { GamePieces } from "@/lib/constants/games";
 import { apiClient } from "@/lib/api";
 import { useStacks } from "@/hooks/use-stacks";
-import { ClarityValue, TupleCV, cvToJSON } from "@stacks/transactions";
+import { ClarityValue, TupleCV, UIntCV } from "@stacks/transactions";
 
 export default function PlayWithAI() {
   const {
@@ -34,6 +34,18 @@ export default function PlayWithAI() {
 
   const address = userData?.addresses?.stx?.[0]?.address;
   const router = useRouter();
+
+const ai_address = [
+  "0xA1FF1c93600c3487FABBdAF21B1A360630f8bac6",
+  "0xB2EE17D003e63985f3648f6c1d213BE86B474B11",
+  "0xC3FF882E779aCbc112165fa1E7fFC093e9353B21",
+  "0xD4FFDE5296C3EE6992bAf871418CC3BE84C99C32",
+  "0xE5FF75Fcf243C4cE05B9F3dc5Aeb9F901AA361D1",
+  "0xF6FF469692a259eD5920C15A78640571ee845E8",
+  "0xA7FFE1f969Fa6029Ff2246e79B6A623A665cE69",
+  "0xB8FF2cEaCBb67DbB5bc14D570E7BbF339cE240F6",
+];
+
 
   const username = tycoonUser?.username ?? "";
   const gameCode = generateGameCode();
@@ -59,85 +71,111 @@ export default function PlayWithAI() {
     };
   };
 
-  const handlePlay = async () => {
-    if (!address || !username || !checkIfRegistered) {
-      toast.error("Connect wallet & register first");
-      return;
-    }
+const handlePlay = async () => {
+  if (!address || !username || !checkIfRegistered) {
+    toast.error("Connect wallet & register first");
+    return;
+  }
 
-    const toastId = toast.loading(
-      `Summoning ${settings.aiCount} AI rival${settings.aiCount > 1 ? "s" : ""}...`
+  const toastId = toast.loading(
+    `Summoning ${settings.aiCount} AI rival${settings.aiCount > 1 ? "s" : ""}...`
+  );
+
+  try {
+    // CREATE ON-CHAIN
+    await handleCreateAiGame(
+      username,
+      settings.aiCount,
+      settings.symbol,
+      settings.aiCount,
+      gameCode,
+      settings.startingCash
     );
 
-    try {
-      // CREATE ON-CHAIN
-      await handleCreateAiGame(
-        username,
-        settings.aiCount,
-        settings.symbol,
-        settings.aiCount,
-        gameCode,
-        settings.startingCash
-      );
+    // Add 3-second delay
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
+    const onChainGameId: ClarityValue | null = await handleGetGameByCode(gameCode);
 
-const onChainGameId: ClarityValue | null = await handleGetGameByCode(gameCode);
+    if (!onChainGameId) throw new Error("On-chain game failed");
 
-if (!onChainGameId) throw new Error("On-chain game failed");
+    const tuple = onChainGameId as TupleCV;
 
+    // Access your id safely with proper type casting
+    const gameId = ((tuple.value as { id: UIntCV }).id).value; // Assuming tuple.value is an object with 'id' as UIntCV
 
-const tuple = onChainGameId as TupleCV;
+    toast.update(toastId, { render: "Saving arena..." });
 
-// Access your id safely
-const gameId = (tuple.value.id as any).value; // UIntCV.value is bigint
+    // SAVE TO BACKEND
+    const saveRes = await apiClient.post<SaveGameResponse>("/games", {
+      id: Number(gameId),
+      code: gameCode,
+      mode: "PRIVATE",
+      address,
+      symbol: settings.symbol,
+      number_of_players: settings.aiCount + 1,
+      ai_opponents: settings.aiCount,
+      ai_difficulty: settings.aiDifficulty,
+      settings: {
+        auction: settings.auction,
+        rent_in_prison: settings.rentInPrison,
+        mortgage: settings.mortgage,
+        even_build: settings.evenBuild,
+        starting_cash: settings.startingCash,
+        randomize_play_order: settings.randomPlayOrder,
+      },
+    });
 
-console.log("Game ID:", gameId);
+    const dbGameId = saveRes.data?.id ?? saveRes.data;
+    if (!dbGameId) throw new Error("Invalid backend response");
 
+    toast.update(toastId, {
+      render: "Battle begins!",
+      type: "success",
+      isLoading: false,
+      autoClose: 2000,
+    });
+    
+    const usedSymbols = [settings.symbol];
 
-      toast.update(toastId, { render: "Saving arena..." });
+    for (let i = 0; i < settings.aiCount; i++) {
+      try {
+        const aiAddress = ai_address[i];    
+        const available = GamePieces.filter(p => !usedSymbols.includes(p.value));
+        const aiSymbol = available.length > 0
+          ? available[Math.floor(Math.random() * available.length)].value
+          : 2;  // Consider making this a random valid fallback if "dog" is invalid
+        usedSymbols.push(aiSymbol);
 
-      // SAVE TO BACKEND
-      // const saveRes = 
-      await apiClient.post<SaveGameResponse>("/games", {
-        id: Number(onChainGameId),
-        code: gameCode,
-        mode: "PRIVATE",
-        address,
-        symbol: settings.symbol,
-        number_of_players: settings.aiCount + 1,
-        ai_opponents: settings.aiCount,
-        ai_difficulty: settings.aiDifficulty,
-        settings: {
-          auction: settings.auction,
-          rent_in_prison: settings.rentInPrison,
-          mortgage: settings.mortgage,
-          even_build: settings.evenBuild,
-          starting_cash: settings.startingCash,
-          randomize_play_order: settings.randomPlayOrder,
-        },
-      });
-
-      // const dbGameId = saveRes.data.data?.id;
-      // if (!dbGameId) throw new Error("Invalid backend response");
-
-      toast.update(toastId, {
-        render: "Battle begins!",
-        type: "success",
-        isLoading: false,
-        autoClose: 2000,
-      });
-
-      // router.push(`/ai-play?gameCode=${gameCode}`);
-      console.log(`Redirect to /ai-play?gameCode=${gameCode}`);
-    } catch (err: any) {
-      toast.update(toastId, {
-        render: `Error: ${err?.message || "Failed"}`,
-        type: "error",
-        isLoading: false,
-        autoClose: 4000,
-      });
+        await apiClient.post("/game-players/join", {
+          address: aiAddress,
+          symbol: aiSymbol,
+          code: gameCode,
+        });
+      } catch (innerErr: unknown) {
+        let errorMessage = "Unknown error";
+        if (innerErr instanceof Error) {
+          errorMessage = innerErr.message;
+        }
+        toast.error(`Failed to create AI player ${i + 1}: ${errorMessage}`);
+        throw innerErr; 
+      }
     }
-  };
+
+    await apiClient.put(`/games/${dbGameId}`, { status: "RUNNING" });
+    
+    // router.push(`/ai-play?gameCode=${gameCode}`);
+
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "Failed";
+    toast.update(toastId, {
+      render: `Error: ${errorMessage}`,
+      type: "error",
+      isLoading: false,
+      autoClose: 4000,
+    });
+  }
+};
 
   return (
     <div className="min-h-screen bg-settings bg-cover bg-fixed flex items-center justify-center p-4">
@@ -182,7 +220,7 @@ console.log("Game ID:", gameId);
                 </SelectTrigger>
                 <SelectContent>
                   {GamePieces.map((p) => (
-                    <SelectItem key={p.id} value={String(p.id)}>
+                    <SelectItem key={p.id} value={String(p.value)}>
                       {p.name}
                     </SelectItem>
                   ))}
@@ -222,7 +260,7 @@ console.log("Game ID:", gameId);
               <Select
                 value={settings.aiDifficulty}
                 onValueChange={(v) =>
-                  setSettings((s) => ({ ...s, aiDifficulty: v as any }))
+                  setSettings((s) => ({ ...s, aiDifficulty: v as "easy" | "medium" | "hard" | "boss" }))
                 }
               >
                 <SelectTrigger className="h-12 bg-black/40 border-red-500/50 text-white">
@@ -272,26 +310,29 @@ console.log("Game ID:", gameId);
 
             <div className="space-y-4">
               {[
-                { icon: RiAuctionFill, label: "Auction", key: "auction" },
-                { icon: GiPrisoner, label: "Rent in Jail", key: "rentInPrison" },
-                { icon: GiBank, label: "Mortgage", key: "mortgage" },
-                { icon: IoBuild, label: "Even Build", key: "evenBuild" },
-                { icon: FaRandom, label: "Random Order", key: "randomPlayOrder" },
-              ].map((r) => (
-                <div key={r.key} className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    {/* <r.icon className="w-6 h-6 text-cyan-400" /> */}
-                    <span className="text-white text-lg">{r.label}</span>
-                  </div>
+                { icon: RiAuctionFill, label: "Auction", key: "auction" as const },
+                { icon: GiPrisoner, label: "Rent in Jail", key: "rentInPrison" as const },
+                { icon: GiBank, label: "Mortgage", key: "mortgage" as const },
+                { icon: IoBuild, label: "Even Build", key: "evenBuild" as const },
+                { icon: FaRandom, label: "Random Order", key: "randomPlayOrder" as const },
+              ].map((r) => {
+                const Icon = r.icon;
+                return (
+                  <div key={r.key} className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-6 h-6 text-cyan-400" />
+                      <span className="text-white text-lg">{r.label}</span>
+                    </div>
 
-                  <Switch
-                    checked={settings[r.key as keyof typeof settings]}
-                    onCheckedChange={(v) =>
-                      setSettings((s) => ({ ...s, [r.key]: v }))
-                    }
-                  />
-                </div>
-              ))}
+                    <Switch
+                      checked={settings[r.key]}
+                      onCheckedChange={(v) =>
+                        setSettings((s) => ({ ...s, [r.key]: v }))
+                      }
+                    />
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
